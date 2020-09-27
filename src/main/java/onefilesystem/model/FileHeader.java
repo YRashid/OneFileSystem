@@ -10,11 +10,12 @@ import static onefilesystem.utils.Constants.MAX_FILE_SIZE;
 
 @Data
 public class FileHeader implements Serializable {
-    private long order;
+    private final long order;
+    private final long headerPosition;
+    private final long contentPosition;
+
     private String fileName;
     private boolean isDeleted;
-    private long headerPosition;
-    private long contentPosition;
     private int contentRealSize;
 
     public FileHeader(long order, String fileName) {

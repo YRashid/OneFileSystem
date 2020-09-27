@@ -1,6 +1,8 @@
 package onefilesystem;
 
-public interface FileSystem {
+import java.io.Closeable;
+
+public interface FileSystem extends Closeable {
 
     void createFile(String fileName);
 

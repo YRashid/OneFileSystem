@@ -1,11 +1,11 @@
 package onefilesystem;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -21,7 +21,7 @@ import static onefilesystem.utils.Constants.FILE_HEADER_SIZE;
 import static onefilesystem.utils.Constants.MAX_FILES_COUNT;
 
 @Slf4j
-public class OneFileSystem implements FileSystem, Closeable {
+public class OneFileSystem implements FileSystem {
 
     private final OneFileSystemStartupHelper oneFileSystemStartupHelper;
 
@@ -56,15 +56,17 @@ public class OneFileSystem implements FileSystem, Closeable {
         try {
             ValidationService.isFileAlreadyExists(existingFiles, fileName);
 
-            FileHeader fileHeader = new FileHeader(lastFileNumber.getAndIncrement(), fileName);
+            boolean successReuse = reuseDeletedFileSpace(fileName);
+            if (successReuse) {
+                return;
+            }
+
+            FileHeader fileHeader = new FileHeader(lastFileNumber.get(), fileName);
             readWriteService.updateFileHeader(fileHeader);
             existingFiles.put(fileHeader.getFileName(), fileHeader);
+            lastFileNumber.getAndIncrement();
         } catch (IOException e) {
-            lastFileNumber.decrementAndGet();
             throw new OneFileSystemException(e);
-        } catch (RuntimeException e) {
-            lastFileNumber.decrementAndGet();
-            throw e;
         } finally {
             lock.writeLock().unlock();
         }
@@ -170,6 +172,35 @@ public class OneFileSystem implements FileSystem, Closeable {
         ByteBuffer byteBuffer = ByteBuffer.wrap(new byte[FILE_HEADER_SIZE]);
         readWriteService.readBuffer(byteBuffer, position);
         return createFileHeaderFrom(byteBuffer);
+    }
+
+    /**
+     * Переиспользовать место удаленного файла, при создании нового
+     *
+     * @param newFileName - имя нового файла
+     * @return - удалось ли переиспользовать существующее место
+     */
+    private boolean reuseDeletedFileSpace(String newFileName) {
+        Optional<FileHeader> deletedFileHeaderOptional = existingFiles.values().stream()
+                .filter(FileHeader::isDeleted)
+                .findAny();
+
+        if (deletedFileHeaderOptional.isEmpty()) {
+            return false;
+        }
+
+        FileHeader deletedFileHeader = deletedFileHeaderOptional.get();
+
+        deletedFileHeader.setFileName(newFileName);
+        deletedFileHeader.setDeleted(false);
+        deletedFileHeader.setContentRealSize(0);
+        try {
+            readWriteService.updateFileHeader(deletedFileHeader);
+        } catch (IOException e) {
+            throw new OneFileSystemException(e);
+        }
+
+        return true;
     }
 
     /**

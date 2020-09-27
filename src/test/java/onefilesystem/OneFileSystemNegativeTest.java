@@ -30,6 +30,7 @@ class OneFileSystemNegativeTest {
 
     @AfterEach
     public void after() throws IOException {
+        fileSystem.close();
         Files.delete(Paths.get(FILE_SYSTEM_DIRECTORY, FILE_SYSTEM_NAME));
     }
 
