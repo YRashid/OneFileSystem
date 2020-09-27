@@ -84,7 +84,6 @@ class OneFileSystemPositiveTest {
 
     @Test
     void createTenFiles() {
-
         for (int i = 0; i < 10; i++) {
             String fileName = DEFAULT_FILE_NAME + i;
             String expectedContent = DEFAULT_CONTENT + i;
@@ -94,8 +93,6 @@ class OneFileSystemPositiveTest {
 
             assertContent(fileName, expectedContent);
         }
-
-
     }
 
     private void assertContent(String fileName, String expectedContent) {
